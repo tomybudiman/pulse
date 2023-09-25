@@ -10,7 +10,7 @@ import React, {
 } from 'react';
 import {moderateScale} from 'react-native-size-matters/extend';
 import {Text, View, StyleSheet} from 'react-native';
-import {isArray} from 'lodash';
+import {isArray, isEmpty} from 'lodash';
 import {Buffer} from 'buffer';
 
 // Local components
@@ -154,7 +154,11 @@ const OrderBook: ForwardRefRenderFunction<any, OrderBookProps> = (
   return (
     <View style={styles.container}>
       <Text style={styles.titleText}>Order Book</Text>
-      <BarChart bidData={dynamicBookData.bid} askData={dynamicBookData.ask} />
+      <BarChart
+        bidData={dynamicBookData.bid}
+        askData={dynamicBookData.ask}
+        loading={isEmpty(dynamicBookData.bid) && isEmpty(dynamicBookData.ask)}
+      />
     </View>
   );
 };

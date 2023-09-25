@@ -9,39 +9,24 @@ import React, {
   ForwardRefRenderFunction,
 } from 'react';
 import {CandlestickChart as CandlestickChartNative} from 'react-native-wagmi-charts';
-import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {moderateScale} from 'react-native-size-matters/extend';
-import {View, Text, StyleSheet} from 'react-native';
+import {View, StyleSheet} from 'react-native';
 import {isArray, isEmpty} from 'lodash';
 import {Buffer} from 'buffer';
 
-// Global components
-import Pill from '@components/core/Pill';
-
 // Global utils
-import {ActiveTimeframes} from '@utils/types';
+import {Intervals} from '@utils/types';
 
 // Request
 import {getCandles} from '@request';
 
 // Local components
 import Header from './Header';
+import IntervalPills from './IntervalPills';
 
 const styles = StyleSheet.create({
   container: {
     flex: 0,
-  },
-  pillsContainer: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: moderateScale(16),
-  },
-  pillTitleText: {
-    color: '#797979',
-    fontWeight: '900',
-    fontSize: moderateScale(14),
   },
   tooltipText: {
     color: '#ffffff',
@@ -66,7 +51,7 @@ const CandlestickChart: ForwardRefRenderFunction<any, CandlestickChartProps> = (
   ref,
 ) => {
   const connection = new WebSocket('wss://api-pub.bitfinex.com/ws/2');
-  const [timeframePills, setTimeframePills] = useState({
+  const [intervalPills, setTimeframePills] = useState({
     '5m': true,
     '30m': false,
     '1h': false,
@@ -74,16 +59,19 @@ const CandlestickChart: ForwardRefRenderFunction<any, CandlestickChartProps> = (
     '1D': false,
     '1W': false,
   });
+  const [isLoading, setLoadingState] = useState(true);
   const [ohlcDynamicData, setOhlcData] = useState([]);
+  const selectedInterval = useRef(Object.keys(intervalPills)[0]);
   const isWebSocketConnected = useRef(false);
   const isSwitchingTimeframe = useRef(false);
+  const isIntervalSubsMatch = useRef(false);
   const activeChannelId = useRef('');
   const numberOfCandleStickBars = 40;
   // Methods
   const toggleStreaming = useCallback(
     (
       active: boolean = true,
-      activeTimeframe: ActiveTimeframes = Object.keys(timeframePills)[0],
+      activeTimeframe: Intervals = Object.keys(intervalPills)[0],
     ) => {
       if (isWebSocketConnected.current) {
         if (!active && isEmpty(activeChannelId.current)) {
@@ -116,7 +104,7 @@ const CandlestickChart: ForwardRefRenderFunction<any, CandlestickChartProps> = (
   const shapeSubscribingObject = useCallback(
     (
       type: 'subscribe' | 'unsubscribe' = 'subscribe',
-      timeframe: ActiveTimeframes,
+      timeframe: Intervals,
       symbol: string,
     ) => {
       if (type === 'subscribe') {
@@ -135,66 +123,73 @@ const CandlestickChart: ForwardRefRenderFunction<any, CandlestickChartProps> = (
     [activeChannelId.current],
   );
   // Event handler methods
-  const onPressTimeframePill = useCallback((key: ActiveTimeframes) => {
+  const onPressTimeframePill = useCallback((key: Intervals) => {
     if (!isSwitchingTimeframe.current) {
-      const tempTimeframePills = {...timeframePills};
+      const tempTimeframePills = {...intervalPills};
       Object.keys(tempTimeframePills).forEach(eachKey => {
         tempTimeframePills[eachKey] = eachKey === key;
       });
       setTimeframePills(tempTimeframePills);
+      isIntervalSubsMatch.current = false;
       isSwitchingTimeframe.current = true;
       toggleStreaming(false, key);
       setTimeout(() => toggleStreaming(true, key), 500);
     }
   }, []);
-  const onMessageWebSocket = useCallback(
-    event => {
-      const data = JSON.parse(Buffer.from(event.data).toString('utf-8'));
-      if (data.serverId) {
-        isWebSocketConnected.current = true;
+  const onMessageWebSocket = useCallback(event => {
+    const data = JSON.parse(Buffer.from(event.data).toString('utf-8'));
+    if (data.serverId) {
+      isWebSocketConnected.current = true;
+    }
+    if (data.chanId) {
+      const [_, interval] = data.key.split(':');
+      isIntervalSubsMatch.current = selectedInterval.current === interval;
+      activeChannelId.current = data.chanId;
+    }
+    if (isArray(data) && data.length === 2) {
+      const [_, ohlcData] = data;
+      if (
+        isArray(ohlcData) &&
+        ohlcData.length === 6 &&
+        isIntervalSubsMatch.current &&
+        typeof ohlcData !== 'string'
+      ) {
+        const [timestamp, open, close, high, low] = ohlcData;
+        const newOhlcObjectData = {timestamp, open, close, high, low};
+        setOhlcData(prevOhlcData => {
+          if (
+            prevOhlcData.findIndex(
+              eachData => eachData.timestamp === timestamp,
+            ) === -1
+          ) {
+            return [...prevOhlcData, newOhlcObjectData].slice(
+              1,
+              numberOfCandleStickBars + 1,
+            );
+          } else {
+            return prevOhlcData.map(eachData => {
+              if (eachData.timestamp === timestamp) {
+                return newOhlcObjectData;
+              }
+              return eachData;
+            });
+          }
+        });
       }
-      if (data.chanId) {
-        activeChannelId.current = data.chanId;
-      }
-      if (isArray(data) && data.length === 2) {
-        const [_, ohlcData] = data;
-        if (
-          isArray(ohlcData) &&
-          typeof ohlcData !== 'string' &&
-          ohlcData.length === 6
-        ) {
-          const [timestamp, open, close, high, low] = ohlcData;
-          const newOhlcObjectData = {timestamp, open, close, high, low};
-          setOhlcData(prevOhlcData => {
-            if (
-              prevOhlcData.findIndex(
-                eachData => eachData.timestamp === timestamp,
-              ) === -1
-            ) {
-              return [...prevOhlcData, newOhlcObjectData].slice(
-                1,
-                numberOfCandleStickBars + 1,
-              );
-            } else {
-              return prevOhlcData.map(eachData => {
-                if (eachData.timestamp === timestamp) {
-                  return newOhlcObjectData;
-                }
-                return eachData;
-              });
-            }
-          });
-        }
-      }
-    },
-    [timeframePills],
-  );
+    }
+  }, []);
   // Hooks
   useEffect(() => {
+    selectedInterval.current = Object.keys(intervalPills).find(
+      eachKey => intervalPills[eachKey],
+    );
     // WebSocket listener
     connection.onmessage = onMessageWebSocket;
-  }, []);
+  }, [intervalPills]);
   useEffect(() => {
+    if (ohlcDynamicData.length > 0) {
+      setTimeout(() => setLoadingState(false), 1000);
+    }
     setTimeout(() => (isSwitchingTimeframe.current = false), 100);
   }, [ohlcDynamicData]);
   useImperativeHandle(
@@ -210,20 +205,12 @@ const CandlestickChart: ForwardRefRenderFunction<any, CandlestickChartProps> = (
   // Render
   return (
     <View style={styles.container}>
-      <Header ohlcDynamicData={ohlcDynamicData} />
-      <View style={styles.pillsContainer}>
-        <Text style={styles.pillTitleText}>Interval</Text>
-        {Object.keys(timeframePills).map((key: ActiveTimeframes) => {
-          return (
-            <Pill
-              key={key}
-              active={timeframePills[key]}
-              onPress={() => onPressTimeframePill(key)}>
-              {key.toUpperCase()}
-            </Pill>
-          );
-        })}
-      </View>
+      <Header loading={isLoading} ohlcDynamicData={ohlcDynamicData} />
+      <IntervalPills
+        loading={isLoading}
+        intervalPills={intervalPills}
+        onPressPill={key => onPressTimeframePill(key)}
+      />
       <CandlestickChartNative.Provider data={ohlcDynamicData}>
         <CandlestickChartNative>
           <CandlestickChartNative.Candles

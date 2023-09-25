@@ -1,12 +1,9 @@
 import axios from 'axios';
 
 // Global utils
-import {ActiveTimeframes} from '@utils/types';
+import {Intervals} from '@utils/types';
 
-export const getCandles = async (
-  interval: ActiveTimeframes,
-  currency: string,
-) => {
+export const getCandles = async (interval: Intervals, currency: string) => {
   try {
     const response = await axios({
       method: 'get',

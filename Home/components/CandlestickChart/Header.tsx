@@ -1,18 +1,32 @@
-import React, {useMemo, memo} from 'react';
+import React, {memo, useMemo} from 'react';
+import {createShimmerPlaceholder} from 'react-native-shimmer-placeholder';
 import {moderateScale} from 'react-native-size-matters/extend';
+import {LinearGradient} from 'expo-linear-gradient';
 import {Text, View, StyleSheet} from 'react-native';
 
 // Global utils
 import {moneyFormat} from '@utils';
 
+const ShimmerPlaceholder = createShimmerPlaceholder(LinearGradient);
 const styles = StyleSheet.create({
   priceInfoContainer: {
     paddingBottom: moderateScale(16),
     paddingHorizontal: moderateScale(16),
   },
+  currentPriceTextPlaceholder: {
+    width: moderateScale(160),
+    height: moderateScale(36),
+    borderRadius: moderateScale(8),
+  },
   currentPriceText: {
     fontWeight: 'bold',
     fontSize: moderateScale(36),
+  },
+  subCurrentPriceTextLoading: {
+    width: moderateScale(100),
+    height: moderateScale(16),
+    marginTop: moderateScale(4),
+    borderRadius: moderateScale(8),
   },
   subCurrentPriceText: {
     fontSize: moderateScale(16),
@@ -28,10 +42,12 @@ type OhlcDynamicData = {
 };
 
 interface HeaderProps {
+  loading?: boolean;
   ohlcDynamicData?: OhlcDynamicData[];
 }
 
-const Header: React.FC<HeaderProps> = ({ohlcDynamicData}) => {
+const Header: React.FC<HeaderProps> = ({loading = false, ohlcDynamicData}) => {
+  // Constants
   const getLastPrice: number = useMemo(() => {
     return ohlcDynamicData[ohlcDynamicData.length - 1]?.close || 0;
   }, [ohlcDynamicData]);
@@ -86,10 +102,21 @@ const Header: React.FC<HeaderProps> = ({ohlcDynamicData}) => {
   // Render
   return (
     <View style={styles.priceInfoContainer}>
-      <Text style={styles.currentPriceText}>
-        ${moneyFormat(getLastPrice)}.00
-      </Text>
-      <Text style={getSubCurrentPriceTextStyle}>{getSubCurrentPriceText}</Text>
+      {loading ? (
+        <>
+          <ShimmerPlaceholder style={styles.currentPriceTextPlaceholder} />
+          <ShimmerPlaceholder style={styles.subCurrentPriceTextLoading} />
+        </>
+      ) : (
+        <>
+          <Text style={styles.currentPriceText}>
+            ${moneyFormat(getLastPrice)}.00
+          </Text>
+          <Text style={getSubCurrentPriceTextStyle}>
+            {getSubCurrentPriceText}
+          </Text>
+        </>
+      )}
     </View>
   );
 };

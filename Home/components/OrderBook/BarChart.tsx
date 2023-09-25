@@ -6,6 +6,9 @@ import {get, maxBy} from 'lodash';
 // Global utils
 import {moneyFormat} from '@utils';
 
+// Local components
+import BarChartLoading from './BarChartLoading';
+
 const styles = StyleSheet.create({
   container: {
     width: '100%',
@@ -60,11 +63,16 @@ const styles = StyleSheet.create({
 });
 
 interface BarChartProps {
+  loading?: boolean;
   bidData: {price: number; count: number; amount: number}[];
   askData: {price: number; count: number; amount: number}[];
 }
 
-const BarChart: React.FC<BarChartProps> = ({bidData, askData}) => {
+const BarChart: React.FC<BarChartProps> = ({
+  loading = false,
+  bidData,
+  askData,
+}) => {
   const sortedBidData = useMemo(() => {
     return bidData.sort((a, b) => b.price - a.price).slice(0, 15);
   }, [bidData]);
@@ -86,7 +94,9 @@ const BarChart: React.FC<BarChartProps> = ({bidData, askData}) => {
     paddingLeft: moderateScale(8),
     paddingRight: moderateScale(16),
   };
-  return (
+  return loading ? (
+    <BarChartLoading />
+  ) : (
     <View style={styles.container}>
       <View style={styles.sideContainer}>
         <View style={[styles.headerLabelContainer, labelContainerBidStyle]}>
