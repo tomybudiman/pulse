@@ -77,7 +77,10 @@ const CandlestickChart: ForwardRefRenderFunction<any, CandlestickChartProps> = (
         if (!active && isEmpty(activeChannelId.current)) {
           return null;
         } else {
-          // Get initial data from REST API
+          /**
+           * Get initial data from REST API because initial
+           * data from websocket sometimes return an empty array
+           */
           getCandles(activeTimeframe, market).then(response => {
             const reMappedOhlcData = response
               .slice(0, numberOfCandleStickBars)
@@ -89,6 +92,9 @@ const CandlestickChart: ForwardRefRenderFunction<any, CandlestickChartProps> = (
             setOhlcData(reMappedOhlcData);
           });
         }
+        /**
+         * Subscribing or unsubscribing to the websocket based on the shaped object
+         */
         connection.send(
           shapeSubscribingObject(
             active ? 'subscribe' : 'unsubscribe',
@@ -97,6 +103,10 @@ const CandlestickChart: ForwardRefRenderFunction<any, CandlestickChartProps> = (
           ),
         );
       } else {
+        /**
+         * Retry streaming function if websocket server is not
+         * connected yet by calling itself (recursive)
+         */
         setTimeout(() => toggleStreaming(active, activeTimeframe), 500);
       }
     },
@@ -108,18 +118,18 @@ const CandlestickChart: ForwardRefRenderFunction<any, CandlestickChartProps> = (
       timeframe: Intervals,
       symbol: string,
     ) => {
-      if (type === 'subscribe') {
-        return JSON.stringify({
-          event: 'subscribe',
-          channel: 'candles',
-          key: `trade:${timeframe}:t${symbol}`, //'trade:TIMEFRAME:SYMBOL'
-        });
-      } else {
-        return JSON.stringify({
-          event: 'unsubscribe',
-          chanId: activeChannelId.current,
-        });
-      }
+      return JSON.stringify(
+        type === 'subscribe'
+          ? {
+              event: 'subscribe',
+              channel: 'candles',
+              key: `trade:${timeframe}:t${symbol}`, //'trade:TIMEFRAME:SYMBOL'
+            }
+          : {
+              event: 'unsubscribe',
+              chanId: activeChannelId.current,
+            },
+      );
     },
     [activeChannelId.current],
   );
