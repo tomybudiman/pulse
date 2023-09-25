@@ -77,6 +77,7 @@ const CandlestickChart: ForwardRefRenderFunction<any, CandlestickChartProps> = (
         if (!active && isEmpty(activeChannelId.current)) {
           return null;
         } else {
+          // Get initial data from REST API
           getCandles(activeTimeframe, market).then(response => {
             const reMappedOhlcData = response
               .slice(0, numberOfCandleStickBars)
@@ -123,7 +124,7 @@ const CandlestickChart: ForwardRefRenderFunction<any, CandlestickChartProps> = (
     [activeChannelId.current],
   );
   // Event handler methods
-  const onPressTimeframePill = useCallback((key: Intervals) => {
+  const onPressChangeIntervalPill = useCallback((key: Intervals) => {
     if (!isSwitchingTimeframe.current) {
       const tempTimeframePills = {...intervalPills};
       Object.keys(tempTimeframePills).forEach(eachKey => {
@@ -137,15 +138,27 @@ const CandlestickChart: ForwardRefRenderFunction<any, CandlestickChartProps> = (
     }
   }, []);
   const onMessageWebSocket = useCallback(event => {
+    /**
+     * Parse event data from a buffer to an object
+     */
     const data = JSON.parse(Buffer.from(event.data).toString('utf-8'));
+    /**
+     * Check if websocket connected properly to the server
+     */
     if (data.serverId) {
       isWebSocketConnected.current = true;
     }
+    /**
+     * Check if subscription is successful and channel id is returned
+     */
     if (data.chanId) {
       const [_, interval] = data.key.split(':');
       isIntervalSubsMatch.current = selectedInterval.current === interval;
       activeChannelId.current = data.chanId;
     }
+    /**
+     * Receive streaming update data for the chart
+     */
     if (isArray(data) && data.length === 2) {
       const [_, ohlcData] = data;
       if (
@@ -162,11 +175,18 @@ const CandlestickChart: ForwardRefRenderFunction<any, CandlestickChartProps> = (
               eachData => eachData.timestamp === timestamp,
             ) === -1
           ) {
+            /**
+             * Update existing candlestick point data when
+             * websocket send existing data instead the new one
+             */
             return [...prevOhlcData, newOhlcObjectData].slice(
               1,
               numberOfCandleStickBars + 1,
             );
           } else {
+            /**
+             * Push new data to the timeframe data collection
+             */
             return prevOhlcData.map(eachData => {
               if (eachData.timestamp === timestamp) {
                 return newOhlcObjectData;
@@ -209,7 +229,7 @@ const CandlestickChart: ForwardRefRenderFunction<any, CandlestickChartProps> = (
       <IntervalPills
         loading={isLoading}
         intervalPills={intervalPills}
-        onPressPill={key => onPressTimeframePill(key)}
+        onPressPill={key => onPressChangeIntervalPill(key)}
       />
       <CandlestickChartNative.Provider data={ohlcDynamicData}>
         <CandlestickChartNative>
